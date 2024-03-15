@@ -35,14 +35,17 @@ impl Plugin for LuaPlugin {
 fn load_startup_scripts(
     server: Res<AssetServer>,
     script_assets: ResMut<Assets<LuaFennel>>,
-    mut commands: Commands,
+    mut commands: Commands
 ) {
     info!("load_startup_scripts");
     let mut scripts = Vec::new();
     for (id, _) in script_assets.iter() {
-        let mut h = server.get_handle(id);
-        h.make_strong(&script_assets);
-        let path = server.get_handle_path(id).expect("msg");
+        let h = server.get_id_handle(id).expect("msg");
+
+        // GFZ: make_strong no longer exists
+        //h.make_strong(&script_assets);
+
+        let path = server.get_path(id).expect("msg");
         let n = path.path().to_str().unwrap().to_string();
         let s = Script::<LuaFennel>::new(n, h);
 
@@ -59,6 +62,6 @@ fn do_update(mut w: PriorityEventWriter<LuaEvent<()>>) {
             args: (),
             recipients: Recipients::All,
         },
-        0,
+        0
     );
 }
