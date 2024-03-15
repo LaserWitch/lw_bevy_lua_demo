@@ -303,30 +303,18 @@ end
                 }; //;
 
                 if let Err(error) = f.call::<_, ()>(event.args.clone()) {
-                    info!("error: {:?}", error);
-                    // GFZ: this now panics
-                    info!("world: {:?}", world);
                     let mut world = world.write();
-                    info!("world: {:?}", world);
 
-                    match world.remove_resource::<CachedScriptState<Self>>() {
-                        Some(mut state) => {
-                            //info!("state: {:?}", state);
-                            //.expect("some type of resource");
+                    let mut state = world.remove_resource::<CachedScriptState<Self>>().unwrap();
+                    let (_, mut error_wrt, _) = state.event_state.get_mut(&mut world);
 
-                            let (_, mut error_wrt, _) = state.event_state.get_mut(&mut world);
+                    let error = ScriptError::RuntimeError {
+                        script: script_data.name.to_owned(),
+                        msg: error.to_string(),
+                    };
 
-                            let error = ScriptError::RuntimeError {
-                                script: script_data.name.to_owned(),
-                                msg: error.to_string(),
-                            };
-
-                            error!("{}", error);
-                            error_wrt.send(ScriptErrorEvent { error });
-                            world.insert_resource(state);
-                        }
-                        None => warn!("got none"),
-                    }
+                    error_wrt.send(ScriptErrorEvent { error });
+                    world.insert_resource(state);
                 }
             }
         });

@@ -20,7 +20,7 @@ pub struct TagA {}
 pub struct TagB {}
 
 #[derive(Component, Reflect, Default, Clone, Copy, Deref, DerefMut)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct Velocity(pub Vec3);
 
 pub fn drift(mut q: Query<(&Velocity, &mut Transform)>, time: Res<Time>) {
@@ -31,7 +31,7 @@ pub fn drift(mut q: Query<(&Velocity, &mut Transform)>, time: Res<Time>) {
 }
 
 #[derive(Component, Reflect, Default, Clone, Copy, Deref, DerefMut)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct Lifetime(pub f32);
 
 pub fn age(mut q: Query<&mut Lifetime>, time: Res<Time>) {
@@ -42,7 +42,8 @@ pub fn age(mut q: Query<&mut Lifetime>, time: Res<Time>) {
 }
 pub fn die(q: Query<(Entity, &Lifetime)>, mut c: Commands) {
     for (e, l) in &q {
-        if **l <= 0.0 {
+        //if **l <= 0.0 {
+        if l.0 <= 0.0 {
             c.entity(e).despawn();
         }
     }

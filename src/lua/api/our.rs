@@ -38,8 +38,6 @@ fn make_colored_triangle(
                 .get_entity_mut(entity)
                 .expect("bad entity")
                 .insert(MaterialMesh2dBundle::<ColorMaterial> {
-                    // GFZ: switching to bevy_math now complains about calling into(), so try removing
-                    //mesh: meshes.add(shape::RegularPolygon::new(size, sides).into()).into(),
                     mesh: meshes.add(RegularPolygon::new(size, sides)).into(),
                     material: materials.add(ColorMaterial::from(color)),
                     transform: Transform {
@@ -56,8 +54,7 @@ fn list_entities(ctx: &Lua, type_name: String) -> Result<Value<'_>, LuaError> {
     // retrieve the world pointer
     let world = ctx.get_world()?;
     let world = world.write();
-
-    let registry: &AppTypeRegistry = world.get_resource().unwrap();
+    let registry = world.get_resource::<AppTypeRegistry>().unwrap();
     let registry = registry.read();
     let c_id = registry
         .get_with_short_type_path(type_name.as_str())
