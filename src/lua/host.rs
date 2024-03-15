@@ -71,11 +71,8 @@ impl<A: LuaArg> ScriptHost for OurScriptHost<A> {
         providers: &mut APIProviders<Self>
     ) -> std::result::Result<Self::ScriptContext, ScriptError> {
         {
-            let lua = self.lua.lock().expect("bad lua state");
             // We build a lua function out of the chunk loaded chunk...
-            //let lua = self.lua.lock().expect("bad lua state");
-            // GFZ: trying another way to wrap lua with a mutex
-            // similar to bevy_mod_scripting_lua/src/lib.rs
+            let lua = self.lua.lock().expect("bad lua state");
             let chunk = lua.load(script).set_name(script_data.name);
             /*
                 .map_err(|e| {

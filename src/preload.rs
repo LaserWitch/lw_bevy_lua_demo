@@ -22,7 +22,8 @@ pub enum GameState {
     Playing,
 }
 
-#[derive(Resource, Default)]
+// GFZ: LoadedFolder field "handles" contains a Vec<UntypedHandle, Global> for the requested folder
+#[derive(Default, Resource)]
 pub struct PendingHandles(Handle<LoadedFolder>);
 
 //Just slurps up the script handles and sticks them in pending handles
@@ -35,6 +36,9 @@ pub fn while_loading(
     handles: Res<PendingHandles>,
     mut next_state: ResMut<NextState<GameState>>
 ) {
+    // GFZ: this won't work if there is more than one load_folder
+    // when the folder has an update, it fires AssetEvent<LoadedFolder>
+    // we use the handles in LoadedFolder to check if recursive deps are met
     for event in events.read() {
         if event.is_loaded_with_dependencies(&handles.0) {
             next_state.set(GameState::Playing);
