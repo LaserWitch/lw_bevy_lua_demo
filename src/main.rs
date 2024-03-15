@@ -1,7 +1,4 @@
-use bevy::{
-    core_pipeline::{bloom::BloomSettings, tonemapping::Tonemapping},
-    prelude::*,
-};
+use bevy::{ core_pipeline::{ bloom::BloomSettings, tonemapping::Tonemapping }, prelude::* };
 
 //Contains the rust-side components and systems,
 // also contains the commented out original 'target' system mod target;

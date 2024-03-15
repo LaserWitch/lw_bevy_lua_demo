@@ -1,14 +1,8 @@
-use std::{
-    marker::PhantomData,
-    sync::Mutex,
-};
+use std::{ marker::PhantomData, sync::Mutex };
 
 use super::lf_file::*;
-use bevy::{ecs::schedule::*, prelude::*};
-use bevy_mod_scripting::{
-    core::{systems::*, world::*},
-    prelude::*,
-};
+use bevy::{ ecs::schedule::*, prelude::* };
+use bevy_mod_scripting::{ core::{ systems::*, world::* }, prelude::* };
 use bevy_mod_scripting_lua::*;
 use mlua::*;
 
@@ -40,7 +34,7 @@ impl<A: LuaArg> ScriptHost for OurScriptHost<A> {
     //Besides the script asset and loader type this is still just a copy of the LuaScriptHost
     fn register_with_app_in_set(app: &mut App, schedule: impl ScheduleLabel, set: impl SystemSet) {
         app.add_priority_event::<Self::ScriptEvent>()
-            .add_asset::<LuaFennel>()
+            .init_asset::<LuaFennel>()
             .init_asset_loader::<LuaFennelLoader>()
             .init_resource::<CachedScriptState<Self>>()
             .init_resource::<ScriptContexts<Self::ScriptContext>>()
@@ -58,7 +52,7 @@ impl<A: LuaArg> ScriptHost for OurScriptHost<A> {
                     script_hot_reload_handler::<Self>,
                 )
                     .chain()
-                    .in_set(set),
+                    .in_set(set)
             );
     }
 
@@ -74,42 +68,54 @@ impl<A: LuaArg> ScriptHost for OurScriptHost<A> {
         &mut self,
         script: &[u8],
         script_data: &ScriptData,
-        providers: &mut APIProviders<Self>,
+        providers: &mut APIProviders<Self>
     ) -> std::result::Result<Self::ScriptContext, ScriptError> {
-
         {
             // We build a lua function out of the chunk loaded chunk...
             let lua = self.lua.lock().expect("bad lua state");
-            let chunk = lua.load(script).set_name(script_data.name).map_err(|e| {
-                ScriptError::FailedToLoad {
-                    script: script_data.name.to_owned(),
-                    msg: e.to_string(),
-                }
-            })?;
+            let chunk = lua.load(script).set_name(script_data.name);
+            /*
+                .map_err(|e| {
+                    ScriptError::FailedToLoad {
+                        script: script_data.name.to_owned(),
+                        msg: e.to_string(),
+                    }
+                })?;
+            */
+
             let wrapped = chunk.into_function();
             // ... and insert it into the globals table under a name unlikely to collide with any user function names.
             // A reference to this function will end up in a table by the time we create another one
             // with this name, so we don't have to worry about tripping ourselves up.
-            lua.globals()
-                .set("__temp_func", wrapped.unwrap())
+
+            // GFZ: compiler warned about possible error in unused Result
+            // TODO: circle back and see if any error handling should be done
+            let _result = lua.globals().set("__temp_func", wrapped.unwrap());
+            //info!("setting global table resulted in {:?}", _result);
+            /*
                 .map_err(|e| ScriptError::FailedToLoad {
                     script: script_data.name.to_owned(),
                     msg: e.to_string(),
                 })?;
+            */
             //Normal require syntax omits the file extension, so we need to strip that off
             //  it could be a fennel file too. Besides the extension everything special about them
             //  is handled before we get here.
-            let name = match (
-                script_data.name.strip_suffix(".lua"),
-                script_data.name.strip_suffix(".fnl"),
-            ) {
+            let name = match
+                (script_data.name.strip_suffix(".lua"), script_data.name.strip_suffix(".fnl"))
+            {
                 (Some(l), None) => l,
                 (None, Some(f)) => f,
                 _ => "badname",
             };
-            info!("building internal loader for module \"{}\" from file {}",name,script_data.name);
+            info!(
+                "building internal loader for module \"{}\" from file {}",
+                name,
+                script_data.name
+            );
             //TODO: the exact logic of when to call on_load may be wonky right now
-            let runstr = format!("
+            let runstr = format!(
+                "
 local name = \"{name}\"
 --Out of significant paranoia, ensure the required table structure exists already
 --  and then make local references to it for brevity
@@ -193,14 +199,15 @@ if loaded[name] then
         r:on_load(name)
     end
 end
-                ");
+                "
+            );
             // all that's left is to run our new chunk inside lua.
             let new_chunk = lua.load(&runstr);
             new_chunk.exec().map_err(|e| ScriptError::FailedToLoad {
                 script: script_data.name.to_owned(),
                 msg: e.to_string(),
             })?;
-        };
+        }
 
         //Provider attachment just gets passed the self lua rather than a contextual lua
         //that's a bit wasteful, and potentially a problem if providers do any unconditual state setup,
@@ -217,7 +224,7 @@ end
         &mut self,
         script_data: &ScriptData,
         _ctx: &mut Self::ScriptContext,
-        providers: &mut APIProviders<Self>,
+        providers: &mut APIProviders<Self>
     ) -> std::result::Result<(), ScriptError> {
         //Only change from LuaScriptHost is passing the self context rather than the passed-in context
         providers.setup_all(script_data, &mut self.lua)
@@ -230,12 +237,14 @@ end
         world: &mut World,
         events: &[Self::ScriptEvent],
         ctxs: impl Iterator<Item = (ScriptData<'a>, &'a mut Self::ScriptContext)>,
-        providers: &mut APIProviders<Self>,
+        providers: &mut APIProviders<Self>
     ) {
         // safety:
         // - we have &mut World access
-        // - we do not use world_ptr after using the world reference which it's derived from
-        let world_ptr = unsafe { WorldPointer::new(world) };
+        // - we do not use the original reference again anywhere in this function
+
+        // GFZ: used to be WorldPointer, now WorldPointerGuard
+        let world = unsafe { WorldPointerGuard::new(world) };
 
         //Original LuaHost would get the script-specific context here
         //  now it has that be an ignored value because we use the shared context
@@ -243,15 +252,14 @@ end
         //  as originally intended
         ctxs.for_each(|(script_data, _)| {
             providers
-                .setup_runtime_all(world_ptr.clone(), &script_data, &mut self.lua)
+                .setup_runtime_all(world.clone(), &script_data, &mut self.lua)
                 .expect("Could not setup script runtime");
 
             //We're going to load with require
             //  so we need the suffixless path
-            let name = match (
-                script_data.name.strip_suffix(".lua"),
-                script_data.name.strip_suffix(".fnl"),
-            ) {
+            let name = match
+                (script_data.name.strip_suffix(".lua"), script_data.name.strip_suffix(".fnl"))
+            {
                 (Some(l), None) => l,
                 (None, Some(f)) => f,
                 _ => "badname",
@@ -274,24 +282,27 @@ end
             let globals = ctx.globals();
             for event in events {
                 // check if this script should handle this event
-                if !event.recipients().is_recipient(&script_data) ||
+                if
+                    !event.recipients().is_recipient(&script_data) ||
                     //the required table needs to be a table to receive any events
-                    globals.get("__event_reciever")
-                        .is_ok_and(|x:LuaValue|
-                            matches!(x,LuaValue::Boolean(_) | LuaValue::Nil))
+                    globals
+                        .get("__event_reciever")
+                        .is_ok_and(|x: LuaValue| matches!(x, LuaValue::Boolean(_) | LuaValue::Nil))
                 {
                     continue;
                 }
                 let t: Table = globals.get("__event_reciever").expect("bad table");
                 let f: Function = match t.raw_get(event.hook_name.clone()) {
-                    Ok(f) => f,
-                    Err(_) => continue, // not subscribed to this event
-                };
+                    Ok(f) => { f }
+                    Err(_) => {
+                        continue;
+                    } // not subscribed to this event
+                }; //;
 
                 if let Err(error) = f.call::<_, ()>(event.args.clone()) {
-                    let mut world = world_ptr.write();
-                    let mut state: CachedScriptState<Self> = world.remove_resource().unwrap();
+                    let mut world = world.write();
 
+                    let mut state = world.remove_resource::<CachedScriptState<Self>>().unwrap();
                     let (_, mut error_wrt, _) = state.event_state.get_mut(&mut world);
 
                     let error = ScriptError::RuntimeError {
@@ -299,7 +310,6 @@ end
                         msg: error.to_string(),
                     };
 
-                    error!("{}", error);
                     error_wrt.send(ScriptErrorEvent { error });
                     world.insert_resource(state);
                 }

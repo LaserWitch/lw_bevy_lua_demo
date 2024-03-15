@@ -23,7 +23,7 @@ impl APIProvider for OurAPI {
     fn setup_script(
         &mut self,
         _: &ScriptData,
-        _: &mut Self::ScriptContext,
+        _: &mut Self::ScriptContext
     ) -> Result<(), ScriptError> {
         Ok(())
     }
@@ -34,16 +34,15 @@ fn insert_function<'lua, A, R, F>(
     ctx: &'lua Lua,
     t: &mut mlua::Table,
     name: &str,
-    f: F,
-) -> Result<(), bevy_mod_scripting::prelude::ScriptError>
-where
-    A: FromLuaMulti<'lua>,
-    R: ToLuaMulti<'lua>,
-    F: 'static + Send + Fn(&'lua Lua, A) -> mlua::Result<R>,
+    f: F
+)
+    -> Result<(), bevy_mod_scripting::prelude::ScriptError>
+    where
+        A: FromLuaMulti<'lua>,
+        R: IntoLuaMulti<'lua>,
+        F: 'static + Send + Fn(&'lua Lua, A) -> mlua::Result<R>
 {
-    t.set(
-        name,
-        ctx.create_function(f).map_err(ScriptError::new_other)?,
+    t.set(name, ctx.create_function(f).map_err(ScriptError::new_other)?).map_err(
+        ScriptError::new_other
     )
-    .map_err(ScriptError::new_other)
 }

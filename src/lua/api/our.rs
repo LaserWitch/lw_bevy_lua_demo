@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
-use bevy_mod_scripting::prelude::{LuaError, ScriptError, Value};
+use bevy::{ prelude::*, sprite::MaterialMesh2dBundle };
+use bevy::math::primitives::RegularPolygon;
+use bevy_mod_scripting::prelude::{ LuaError, ScriptError, Value };
 use bevy_script_api::{
     common::bevy::ScriptTypeRegistration,
     lua::bevy::LuaEntity,
-    prelude::{GetWorld, ToLuaProxy},
+    prelude::{ GetWorld, ToLuaProxy },
 };
 use mlua::Lua;
 
@@ -15,16 +16,14 @@ pub fn insert(ctx: &mut Lua) -> Result<(), ScriptError> {
     let mut t = ctx.create_table().unwrap();
     insert_function(ctx, &mut t, "all_with", list_entities)?;
     insert_function(ctx, &mut t, "new_poly", make_colored_triangle)?;
-    ctx.globals()
-        .set("our", t)
-        .map_err(ScriptError::new_other)?;
+    ctx.globals().set("our", t).map_err(ScriptError::new_other)?;
 
     Ok(())
 }
 
 fn make_colored_triangle(
     ctx: &Lua,
-    args: (LuaEntity, f32, f32, f32, f32, f32, f32, f32, usize),
+    args: (LuaEntity, f32, f32, f32, f32, f32, f32, f32, usize)
 ) -> Result<Value<'_>, LuaError> {
     let (d, x, y, z, r, g, b, size, sides) = args;
     let position = Vec3::new(x, y, z);
@@ -39,9 +38,7 @@ fn make_colored_triangle(
                 .get_entity_mut(entity)
                 .expect("bad entity")
                 .insert(MaterialMesh2dBundle::<ColorMaterial> {
-                    mesh: meshes
-                        .add(shape::RegularPolygon::new(size, sides).into())
-                        .into(),
+                    mesh: meshes.add(RegularPolygon::new(size, sides)).into(),
                     material: materials.add(ColorMaterial::from(color)),
                     transform: Transform {
                         translation: position,
@@ -57,12 +54,11 @@ fn list_entities(ctx: &Lua, type_name: String) -> Result<Value<'_>, LuaError> {
     // retrieve the world pointer
     let world = ctx.get_world()?;
     let world = world.write();
-
-    let registry: &AppTypeRegistry = world.get_resource().unwrap();
+    let registry = world.get_resource::<AppTypeRegistry>().unwrap();
     let registry = registry.read();
     let c_id = registry
-        .get_with_short_name(type_name.as_str())
-        .or_else(|| registry.get_with_name(type_name.as_str()))
+        .get_with_short_type_path(type_name.as_str())
+        .or_else(|| registry.get_with_type_path(type_name.as_str()))
         .map(|registration| ScriptTypeRegistration::new(Arc::new(registration.clone())))
         .unwrap()
         .type_id();
