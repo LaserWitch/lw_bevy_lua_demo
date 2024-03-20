@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_mod_scripting::prelude::*;
+use bevy_mod_scripting::{ core::event::ScriptLoaded, prelude::* };
 use bevy_script_api::lua::RegisterForeignLuaType;
 
 //We need to be state aware so we don't try to start setting up scripts before all are loaded.
@@ -55,7 +55,17 @@ fn load_startup_scripts(
     commands.spawn(ScriptCollection::<LuaFennel> { scripts });
 }
 //I wanted to call script files directly but screw it, I'm using the event system that's in there
-fn do_update(mut w: PriorityEventWriter<LuaEvent<()>>) {
+fn do_update(mut load_events: EventReader<ScriptLoaded>, mut w: PriorityEventWriter<LuaEvent<()>>) {
+    // GFZ: this fires after load_script and setup_script
+    for load_event in load_events.read() {
+        let on_load = LuaEvent {
+            hook_name: "on_load".to_string(),
+            args: (),
+            recipients: Recipients::ScriptID(load_event.sid),
+        };
+        w.send(on_load, 0);
+    }
+
     w.send(
         LuaEvent {
             hook_name: "on_level".to_string(),
