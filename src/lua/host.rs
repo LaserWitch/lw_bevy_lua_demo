@@ -162,10 +162,10 @@ local function loader()
     else
         final_table = result_table
     end
-    --this crashes if a system mutates the exclusive world ref and the on_load uses it too
-    --if type(final_table) == \"table\" and type(final_table.on_load) == \"function\" then
-    --    final_table:on_load(name)
-    --end
+-- GFZ: doesn't seem like this runs
+--    if type(final_table) == \"table\" and type(final_table.on_load) == \"function\" then
+--        final_table:on_load(name)
+--    end
     return final_table
 end
 
@@ -194,6 +194,7 @@ local function rp(depth, tab)
     end
 end
 
+--this crashes if a system mutates the exclusive world ref and the on_load uses it too
 --if loaded[name] then 
 --    local r = loader()
 --    if r and type(r) == \"table\" and r.on_load then
@@ -208,7 +209,6 @@ end
                 script: script_data.name.to_owned(),
                 msg: e.to_string(),
             })?;
-            // GFZ: FIXME fire an event here or just use the AssetServer event?
         }
 
         //Provider attachment just gets passed the self lua rather than a contextual lua
@@ -312,6 +312,7 @@ end
                         msg: error.to_string(),
                     };
 
+                    error!("{}", error);
                     error_wrt.send(ScriptErrorEvent { error });
                     world.insert_resource(state);
                 }
