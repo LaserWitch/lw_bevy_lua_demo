@@ -195,12 +195,12 @@ local function rp(depth, tab)
 end
 
 --this crashes if a system mutates the exclusive world ref and the on_load uses it too
---if loaded[name] then 
---    local r = loader()
+if loaded[name] then 
+    local r = loader()
 --    if r and type(r) == \"table\" and r.on_load then
 --        r:on_load(name)
 --    end
---end
+end
                 "
             );
             // all that's left is to run our new chunk inside lua.
