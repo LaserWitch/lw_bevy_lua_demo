@@ -1,5 +1,5 @@
 use bevy_mod_scripting::prelude::{LuaError, ScriptError, Value};
-use bevy_script_api::prelude::ToLuaProxy;
+use bevy_script_api::prelude::IntoLuaProxy;
 use mlua::Lua;
 use rand::{rngs::ThreadRng, Rng};
 use rand_distr::Standard;

@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use bevy_mod_scripting::prelude::{LuaError, ScriptError, Value};
+use bevy_script_api::providers::bevy_ecs::LuaEntity;
 use bevy_script_api::{
     common::bevy::ScriptTypeRegistration,
-    lua::bevy::LuaEntity,
-    prelude::{GetWorld, ToLuaProxy},
+    prelude::{GetWorld, IntoLuaProxy},
 };
 use mlua::Lua;
 

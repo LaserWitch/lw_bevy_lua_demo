@@ -27,8 +27,9 @@ use bevy_mod_scripting::core::{
     hosts::{Recipients, Script, ScriptCollection},
     AddScriptApiProvider, AddScriptHost, AddScriptHostHandler, ScriptingPlugin,
 };
+use bevy_mod_scripting::prelude::LuaBevyAPIProvider;
 use bevy_mod_scripting_lua::LuaEvent;
-use bevy_script_api::lua::{bevy::LuaBevyAPIProvider, RegisterForeignLuaType};
+use bevy_script_api::lua::RegisterForeignLuaType;
 use ons_gamestates::GameState;
 
 #[derive(AssetCollection, Resource, Default)]

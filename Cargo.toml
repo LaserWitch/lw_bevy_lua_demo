@@ -20,9 +20,13 @@ opt-level = 's'
 
 mlua = "0"
 
-bevy_mod_scripting = { version = "0.5",features = ["lua54","lua_script_api"] }
-bevy_mod_scripting_lua = "0.5"
-bevy_script_api = "0.5"
+bevy_mod_scripting = { git = "https://github.com/makspll/bevy_mod_scripting.git", branch = "fix/wrappers-public", features = ["lua54","lua_script_api"] }
+bevy_mod_scripting_lua = { git = "https://github.com/makspll/bevy_mod_scripting.git", branch = "fix/wrappers-public"}
+bevy_script_api = { git = "https://github.com/makspll/bevy_mod_scripting.git", branch = "fix/wrappers-public"}
+
+#bevy_mod_scripting = { version = "0.6",features = ["lua54","lua_script_api"] }
+#bevy_mod_scripting_lua = "0.6"
+#bevy_script_api = "0.6"
 bevy = { version = "0.13", features = ["dynamic_linking", "serialize","bevy_asset","bevy_core_pipeline","bevy_pbr","bevy_render","bevy_sprite","bevy_winit","hdr","multi-threaded","tonemapping_luts","ktx2","zstd","file_watcher","png","wayland"] , default-features = false }
 rand = "0.8.5"
 rand_distr = "0.4.3"
