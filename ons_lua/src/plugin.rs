@@ -28,6 +28,7 @@ use bevy_mod_scripting::core::{
     AddScriptApiProvider, AddScriptHost, AddScriptHostHandler, ScriptingPlugin,
 };
 use bevy_mod_scripting::prelude::LuaBevyAPIProvider;
+use bevy_mod_scripting::prelude::LuaCoreBevyAPIProvider;
 use bevy_mod_scripting_lua::LuaEvent;
 use bevy_script_api::lua::RegisterForeignLuaType;
 use ons_gamestates::GameState;
@@ -53,8 +54,9 @@ impl Plugin for LuaPlugin {
             .insert_resource(FrameCount::default())
             .add_systems(PostUpdate, tick_frames)
             .add_script_host::<OurScriptHost<()>>(PostUpdate)
-            .add_api_provider::<OurScriptHost<()>>(Box::new(OurAPIBase))
+            .add_api_provider::<OurScriptHost<()>>(Box::new(LuaCoreBevyAPIProvider))
             .add_api_provider::<OurScriptHost<()>>(Box::new(LuaBevyAPIProvider))
+            .add_api_provider::<OurScriptHost<()>>(Box::new(OurAPIBase))
             .add_script_handler::<OurScriptHost<()>, 0, 0>(OnExit(GameState::SetupScripts))
             .add_script_handler::<OurScriptHost<()>, 0, 0>(PostUpdate)
             .add_systems(

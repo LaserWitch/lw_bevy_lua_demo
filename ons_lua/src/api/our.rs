@@ -58,10 +58,10 @@ fn make_colored_triangle(
     true.to_lua_proxy(ctx)
 }
 fn list_entities(ctx: &Lua, type_name: String) -> Result<Value<'_>, LuaError> {
+     
     // retrieve the world pointer
-    let world = ctx.get_world()?;
+    let world = ctx.get_world().expect("couldn't get world pointer");
     let world = world.write();
-
     let registry: &AppTypeRegistry = world.get_resource().unwrap();
     let registry = registry.read();
     let c_id = registry
@@ -70,11 +70,19 @@ fn list_entities(ctx: &Lua, type_name: String) -> Result<Value<'_>, LuaError> {
         .map(|registration| ScriptTypeRegistration::new(Arc::new(registration.clone())))
         .unwrap()
         .type_id();
-    let entity_list: Vec<_> = world
+    let entity_list: Vec<_> = 
+        world
         .iter_entities()
         .map(|entity| (entity.id(), entity.contains_type_id(c_id)))
         .filter(|pair| pair.1)
         .map(|(id, _)| id)
         .collect();
+    if entity_list.len() == 0{
     entity_list.to_lua_proxy(ctx)
+    }
+    else{
+        Ok(Value::Table(ctx.create_table().unwrap()))
+    }
+//    Ok(Value::Table(ctx.create_table().unwrap()))
+    
 }
