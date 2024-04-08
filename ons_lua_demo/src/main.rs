@@ -9,20 +9,21 @@ mod target;
 use target::*;
 
 //Contains systems for waiting for all assets to load before going into update state
-mod preload;
-use preload::*;
-
+//mod preload;
+//use preload::*;
+//use ons_preload::*;
 //Contains all our scripting stuff, naturally.
-mod lua;
-use lua::*;
+//mod lua;
+use ons_gamestates::*;
+use ons_lua::*;
 
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup)
+        .add_plugins(DefaultPlugins)
         .add_plugins(TargetGameplay)
-        .add_plugins(LoadScreenPlugin)
-        .add_plugins(LuaPlugin)
+        .add_plugins((GameStatesPlugin, LuaPlugin))
         .run();
 }
 

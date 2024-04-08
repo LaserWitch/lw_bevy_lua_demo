@@ -1,3 +1,9 @@
+# Repo status:
+
+In addition to the notes below, this repository currently reflects extracted portions of a larger project workspace, and are undergoing revision. There's a somewhat excessive mess and lack of documentation as a result.
+
+It also now is designed for compilation on wsl and may have filepath troubles if built directly in windows. Sorry.
+
 # lw_luademo
 
 This repo is my exploratory example usage of [bevy_mod_scripting](https://github.com/makspll/bevy_mod_scripting)(BMS), a scripting crate for the [Bevy engine](https://bevyengine.org/). BMS is somewhat language agnostic, but I am dealing specifically with Lua.

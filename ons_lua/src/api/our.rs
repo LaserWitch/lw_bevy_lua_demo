@@ -12,11 +12,15 @@ use mlua::Lua;
 use super::insert_function;
 
 pub fn insert(ctx: &mut Lua) -> Result<(), ScriptError> {
-    let mut t = ctx.create_table().unwrap();
-    insert_function(ctx, &mut t, "all_with", list_entities)?;
-    insert_function(ctx, &mut t, "new_poly", make_colored_triangle)?;
+    let mut our_t = ctx
+        .globals()
+        .get("our")
+        .unwrap_or(ctx.create_table().unwrap());
+
+    insert_function(ctx, &mut our_t, "all_with", list_entities)?;
+    insert_function(ctx, &mut our_t, "new_poly", make_colored_triangle)?;
     ctx.globals()
-        .set("our", t)
+        .set("our", our_t)
         .map_err(ScriptError::new_other)?;
 
     Ok(())
@@ -40,7 +44,7 @@ fn make_colored_triangle(
                 .expect("bad entity")
                 .insert(MaterialMesh2dBundle::<ColorMaterial> {
                     mesh: meshes
-                        .add(shape::RegularPolygon::new(size, sides).into())
+                        .add(bevy::math::primitives::RegularPolygon::new(size, sides))
                         .into(),
                     material: materials.add(ColorMaterial::from(color)),
                     transform: Transform {
@@ -61,8 +65,8 @@ fn list_entities(ctx: &Lua, type_name: String) -> Result<Value<'_>, LuaError> {
     let registry: &AppTypeRegistry = world.get_resource().unwrap();
     let registry = registry.read();
     let c_id = registry
-        .get_with_short_name(type_name.as_str())
-        .or_else(|| registry.get_with_name(type_name.as_str()))
+        .get_with_short_type_path(type_name.as_str())
+        .or_else(|| registry.get_with_type_path(type_name.as_str()))
         .map(|registration| ScriptTypeRegistration::new(Arc::new(registration.clone())))
         .unwrap()
         .type_id();

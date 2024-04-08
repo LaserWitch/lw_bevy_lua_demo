@@ -1,4 +1,4 @@
-(local {: add_component} (require :scripts/common))
+(local {: add_component} (require :common))
 
 (comment "
   on_load runs every time the script is loaded,
@@ -7,8 +7,10 @@
   effectively cleaning the scene")
 
 (fn on_load []
-  (each [k v (pairs (our.all_with :TagA))]
-    (local l (add_component v :Lifetime))
-    (tset l 1 0)))
+; onload all_with currently crashes idk why
+;  (each [k v (pairs (our.all_with :TagA))]
+;    (local l (add_component v :Lifetime))
+;    (tset l 1 0))
+)
 
 {: on_load}

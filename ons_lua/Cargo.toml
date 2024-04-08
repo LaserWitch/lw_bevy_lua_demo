@@ -1,0 +1,20 @@
+[package]
+name = "ons_lua"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy_mod_scripting = { workspace=true }
+bevy_mod_scripting_lua = { workspace=true }
+mlua = { workspace=true }
+bevy_script_api = { workspace=true }
+bevy = { workspace=true }#["dynamic_linking", "serialize","bevy_asset","bevy_core_pipeline","bevy_pbr","bevy_render","bevy_sprite","bevy_winit","hdr","multi-threaded","tonemapping_luts","ktx2","zstd","file_watcher","embedded_watcher"] , default-features = false }
+
+ons_gamestates = {path = "../ons_gamestates/"}
+rand = { workspace=true }
+rand_distr = { workspace=true }
+anyhow = { workspace=true }
+serde = { workspace=true }
+bevy_asset_loader = { workspace=true }

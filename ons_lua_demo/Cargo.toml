@@ -1,0 +1,14 @@
+[package]
+name = "ons_lua_demo"
+version = "0.1.0"
+edition = "2021"
+default-run = "ons_lua_demo"
+
+[dependencies]
+bevy = { workspace=true }
+ons_lua = {path = "../ons_lua/"}
+ons_gamestates = {path = "../ons_gamestates/"}
+rand = { workspace=true }
+rand_distr = { workspace=true }
+anyhow = { workspace=true }
+serde = { workspace=true }

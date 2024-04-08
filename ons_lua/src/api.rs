@@ -6,9 +6,9 @@ mod random;
 
 /// In general this is quite rough code, and probably handles results in a very sub-optimal ways.
 #[derive(Default)]
-pub struct OurAPI;
+pub struct OurAPIBase;
 
-impl APIProvider for OurAPI {
+impl APIProvider for OurAPIBase {
     type APITarget = Mutex<Lua>;
     type DocTarget = LuaDocFragment;
     type ScriptContext = Mutex<Lua>;
@@ -30,7 +30,7 @@ impl APIProvider for OurAPI {
 }
 
 //Generalizing some from the bevy_mod_scripting API provider examples
-fn insert_function<'lua, A, R, F>(
+pub fn insert_function<'lua, A, R, F>(
     ctx: &'lua Lua,
     t: &mut mlua::Table,
     name: &str,
@@ -38,7 +38,7 @@ fn insert_function<'lua, A, R, F>(
 ) -> Result<(), bevy_mod_scripting::prelude::ScriptError>
 where
     A: FromLuaMulti<'lua>,
-    R: ToLuaMulti<'lua>,
+    R: IntoLuaMulti<'lua>,
     F: 'static + Send + Fn(&'lua Lua, A) -> mlua::Result<R>,
 {
     t.set(

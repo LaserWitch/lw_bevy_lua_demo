@@ -1,11 +1,12 @@
 
 (comment "import a few helpers from the common libscript")
-(local {: add_component : count_table} (require :scripts/common))
-
+(print "foo")
 ; Live development and ECS composition!
 ;; Just a fun demo of how this can work
 ;; adjust values, or comment out sections, and see the app respond
 (fn on_level []
+  (local {: add_component : count_table} (require :common))
+
   (comment "First check how many entities are active with our tracking tag
     If there's less than our threshold we'll spawn one this frame.")
   (when (> 1000 (count_table (our.all_with :TagA)))
@@ -42,7 +43,7 @@
         (tset life 1 (* (rand.unit) 4)))
 
       (comment "Make them go zoom")
-      (let [speed 1000
+      (let [speed 100
             _ (comment "Velocity is a deref tuple in rust and our translation to lua
               is currently a bit awkwar  so we need a bit of extra accessing stuff")
             vel (. (add_component e :Velocity) 1)]

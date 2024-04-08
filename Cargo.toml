@@ -1,13 +1,31 @@
-[package]
-name = "luademo"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = [
+    "ons_lua_demo",
+    "ons_gamestates",
+    "ons_lua",
+]
 
-[dependencies]
-bevy_mod_scripting = { git = "https://github.com/makspll/bevy_mod_scripting.git", rev = "7590248", features = ["lua54","lua_script_api"] }
-bevy_mod_scripting_lua = { git = "https://github.com/makspll/bevy_mod_scripting.git", rev = "7590248"}
-mlua = "*"
-bevy = { version = "0.11.2", features = ["dynamic_linking", "serialize","bevy_asset","bevy_core_pipeline","bevy_pbr","bevy_render","bevy_sprite","bevy_winit","filesystem_watcher","hdr","multi-threaded","tonemapping_luts","ktx2","zstd"] , default-features = false }
-bevy_script_api = {git = "https://github.com/makspll/bevy_mod_scripting.git", rev = "7590248"}
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 's'
+[workspace.dependencies]
+
+mlua = "0"
+
+bevy_mod_scripting = { version = "0.5",features = ["lua54","lua_script_api"] }
+bevy_mod_scripting_lua = "0.5"
+bevy_script_api = "0.5"
+bevy = { version = "0.13", features = ["dynamic_linking", "serialize","bevy_asset","bevy_core_pipeline","bevy_pbr","bevy_render","bevy_sprite","bevy_winit","hdr","multi-threaded","tonemapping_luts","ktx2","zstd","file_watcher","png","wayland"] , default-features = false }
 rand = "0.8.5"
 rand_distr = "0.4.3"
+anyhow = "1.0.75"
+serde = "1.0.193"
+bevy_asset_loader = "0.20"

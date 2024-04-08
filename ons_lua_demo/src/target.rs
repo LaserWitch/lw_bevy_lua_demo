@@ -12,15 +12,15 @@ impl Plugin for TargetGameplay {
 }
 //Tag components make it easy for us to keep track of a few flavors of entity
 #[derive(Component, Reflect, Default, Clone, Copy)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct TagA {}
 
 #[derive(Component, Reflect, Default, Clone, Copy)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct TagB {}
 
 #[derive(Component, Reflect, Default, Clone, Copy, Deref, DerefMut)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct Velocity(pub Vec3);
 
 pub fn drift(mut q: Query<(&Velocity, &mut Transform)>, time: Res<Time>) {
@@ -31,7 +31,7 @@ pub fn drift(mut q: Query<(&Velocity, &mut Transform)>, time: Res<Time>) {
 }
 
 #[derive(Component, Reflect, Default, Clone, Copy, Deref, DerefMut)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct Lifetime(pub f32);
 
 pub fn age(mut q: Query<&mut Lifetime>, time: Res<Time>) {

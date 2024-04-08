@@ -1,24 +1,32 @@
-use std::{
-    marker::PhantomData,
-    sync::Mutex,
-};
+use std::{collections::HashSet, marker::PhantomData, sync::Mutex};
 
-use super::lf_file::*;
+use crate::asset::{LuaFennel, LuaFennelLoader};
 use bevy::{ecs::schedule::*, prelude::*};
 use bevy_mod_scripting::{
-    core::{systems::*, world::*},
-    prelude::*,
+    core::{
+        event::ScriptEvent,
+        events::AddPriorityEvent,
+        hosts::{APIProviders, Script, ScriptCollection, ScriptContexts, ScriptData, ScriptHost},
+        systems::*,
+        world::*,
+    },
+    prelude::{LuaValue, ScriptError, ScriptErrorEvent},
 };
-use bevy_mod_scripting_lua::*;
-use mlua::*;
+use bevy_mod_scripting_lua::{docs::LuaDocFragment, prelude::*, *};
 
+use mlua::*;
 #[derive(Resource)]
 /// OurScriptHost is derived from bevy_mod_scripting's LuaScriptHost.
 /// Where LuaHost stores a new lua state in the context objects for each script,
 /// OurHost instead stores it's own internal lua state that it runs every script in.
 pub struct OurScriptHost<A: LuaArg> {
     lua: Mutex<Lua>,
+    //symbolic_name: String,
+    known_scripts: HashSet<Handle<LuaFennel>>,
+    pub loader_asset: Option<Handle<LuaFennel>>,
+    pub fennel: Option<Handle<LuaFennel>>,
     _ph: PhantomData<A>,
+    start_finished: bool,
 }
 
 impl<A: LuaArg> Default for OurScriptHost<A> {
@@ -26,21 +34,194 @@ impl<A: LuaArg> Default for OurScriptHost<A> {
         Self {
             _ph: Default::default(),
             lua: Mutex::from(Lua::new()),
+            //symbolic_name: String::
+            known_scripts: HashSet::<Handle<LuaFennel>>::default(),
+            loader_asset: None,
+            fennel: None,
+            start_finished: false,
         }
     }
 }
+impl<A: LuaArg> OurScriptHost<A> {
+    pub fn run_asset_module(
+        &mut self,
+        name: &std::string::String,
+        handle: &Handle<LuaFennel>,
+        asset: &LuaFennel,
+    ) -> std::result::Result<(), ScriptError> {
+        let is_fennel = asset.fennel;
+        let r = if is_fennel {
+            self.insert_fennel_module(name, &std::string::String::from(asset.source()))
+        } else {
+            self.insert_lua_module(name, &std::string::String::from(asset.source()))
+        };
+        //info!("handle = {:#?}", handle);
+        self.known_scripts.insert(handle.clone());
+        r
+    }
+    pub fn run_lua_bare(
+        &self,
+        name: &std::string::String,
+        source: &std::string::String,
+    ) -> std::result::Result<(), ScriptError> {
+        let lua = self.lua.lock().expect("Lua poinsoned");
+
+        let c = lua
+            .load(source)
+            .set_name(name)
+            .exec()
+            .map_err(|e| ScriptError::FailedToLoad {
+                script: name.clone(),
+                msg: e.to_string(),
+            })?;
+        Ok(())
+    }
+    fn insert_lua_module(
+        &self,
+        name: &std::string::String,
+        source: &std::string::String,
+    ) -> std::result::Result<(), ScriptError> {
+        let lua = self.lua.lock().expect("Lua poinsoned");
+        let l_source = lua.create_string(source).expect("lua source var");
+        let l_name = lua.create_string(name).expect("lua_name var");
+
+        let c = lua
+            .load(
+                "
+local args  = {...}
+local src = args[1]
+local name = args[2]
+our_tools:insert_module(name,true,src)
+",
+            )
+            .set_name(name)
+            .call((l_source, l_name))
+            .map_err(|e| ScriptError::FailedToLoad {
+                script: name.clone(),
+                msg: e.to_string(),
+            })?;
+        Ok(())
+    }
+    fn insert_fennel_module(
+        &self,
+        name: &std::string::String,
+        source: &std::string::String,
+    ) -> std::result::Result<(), ScriptError> {
+        let lua = self.lua.lock().expect("Lua poinsoned");
+        let l_source = lua.create_string(source).expect("lua source var");
+        let l_name = lua.create_string(name).expect("lua_name var");
+
+        let c = lua
+            .load(
+                "
+local args  = {...}
+local src = args[1]
+local name = args[2]
+our_tools:insert_module(name,false,src)",
+            )
+            .set_name(name);
+        c.call((l_source, l_name))
+            .map_err(|e| ScriptError::FailedToLoad {
+                script: name.clone(),
+                msg: e.to_string(),
+            })?;
+        Ok(())
+    }
+    pub fn try_start(&mut self, assets: &Res<Assets<LuaFennel>>) {
+        if self.fennel.is_none() || self.loader_asset.is_none() {
+            return;
+        }
+        let l_handle = self.loader_asset.clone().unwrap();
+        let f_handle = self.fennel.clone().unwrap();
+        let loader = assets.get(&l_handle);
+        let fennel = assets.get(&f_handle);
+        if loader.is_none() || fennel.is_none() {
+            return;
+        }
+        let l_script = loader.unwrap();
+        let f_script = fennel.unwrap();
+        info!("running setup scripts");
+        let ln = "loader".to_string();
+        let l_run = self.run_lua_bare(&ln, &l_script.source().to_string());
+        self.print_result(&l_run, false);
+        let f_n = "fennel".to_string();
+        let f_run = self.run_asset_module(&f_n, &f_handle, f_script);
+        self.print_result(&f_run, false);
+
+        if l_run.is_ok() && f_run.is_ok() {
+            self.start_finished = true;
+        }
+    }
+    pub fn ready(&self) -> bool {
+        self.start_finished
+    }
+    pub fn activate_pending_modules(&mut self) -> std::result::Result<(), ScriptError> {
+        let r = self.run_lua_bare(
+            &std::string::String::from("activate"),
+            &std::string::String::from("our_tools:activate_all_pending()"),
+        );
+        self.print_result(&r, true);
+        r
+    }
+    pub fn print_result(&self, r: &std::result::Result<(), ScriptError>, vital: bool) {
+        match r {
+            Ok(_) => (),
+            Err(ScriptError::FailedToLoad { script, msg }) => {
+                error!("Failed to load '{script}': {msg}")
+            }
+            Err(ScriptError::InvalidCallback {
+                script,
+                callback,
+                msg,
+            }) => error!("Callback error in {script}\n{callback}\n{msg}"),
+            Err(ScriptError::RuntimeError { script, msg }) => {
+                error!("Runtime error in {script}\n{msg}")
+            }
+            Err(e) => error!("{e:#?}"),
+        };
+        match r {
+            Ok(_) => (),
+            Err(_) => {
+                if vital {
+                    panic!();
+                }
+            }
+        }
+    }
+}
+
+pub fn print_result_mlua(r: &std::result::Result<(), LuaError>, vital: bool) {
+    match r {
+        Ok(_) => (),
+        Err(Error::SyntaxError { message, .. }) => error!(message),
+        Err(Error::CallbackError { traceback, cause }) => {
+            error!("Callback error\n{traceback}\n{cause}")
+        }
+        Err(Error::RuntimeError(e)) => error!("Lua runtime error {e}"),
+        Err(e) => error!("{e:?}"),
+    };
+    match r {
+        Ok(_) => (),
+        Err(_) => {
+            if vital {
+                panic!();
+            }
+        }
+    }
+}
+
 // TODO: ensure run_one_shot works properly. It probably doesn't with the event handler changes.
 impl<A: LuaArg> ScriptHost for OurScriptHost<A> {
     type ScriptContext = Mutex<Lua>;
     type APITarget = Mutex<Lua>;
-    type ScriptEvent = LuaEvent<A>;
+    type ScriptEvent = bevy_mod_scripting::lua::LuaEvent<A>;
     type ScriptAsset = LuaFennel;
     type DocTarget = LuaDocFragment;
 
     //Besides the script asset and loader type this is still just a copy of the LuaScriptHost
     fn register_with_app_in_set(app: &mut App, schedule: impl ScheduleLabel, set: impl SystemSet) {
         app.add_priority_event::<Self::ScriptEvent>()
-            .add_asset::<LuaFennel>()
+            .init_asset::<LuaFennel>()
             .init_asset_loader::<LuaFennelLoader>()
             .init_resource::<CachedScriptState<Self>>()
             .init_resource::<ScriptContexts<Self::ScriptContext>>()
@@ -76,22 +257,22 @@ impl<A: LuaArg> ScriptHost for OurScriptHost<A> {
         script_data: &ScriptData,
         providers: &mut APIProviders<Self>,
     ) -> std::result::Result<Self::ScriptContext, ScriptError> {
-
-        {
+        let r: std::result::Result<(), ScriptError> = {
             // We build a lua function out of the chunk loaded chunk...
             let lua = self.lua.lock().expect("bad lua state");
-            let chunk = lua.load(script).set_name(script_data.name).map_err(|e| {
-                ScriptError::FailedToLoad {
+            let chunk = lua
+                .load(script)
+                .set_name(script_data.name)
+                .into_function()
+                .map_err(|e| ScriptError::FailedToLoad {
                     script: script_data.name.to_owned(),
                     msg: e.to_string(),
-                }
-            })?;
-            let wrapped = chunk.into_function();
+                })?;
             // ... and insert it into the globals table under a name unlikely to collide with any user function names.
             // A reference to this function will end up in a table by the time we create another one
             // with this name, so we don't have to worry about tripping ourselves up.
             lua.globals()
-                .set("__temp_func", wrapped.unwrap())
+                .set("__temp_func", chunk)
                 .map_err(|e| ScriptError::FailedToLoad {
                     script: script_data.name.to_owned(),
                     msg: e.to_string(),
@@ -107,7 +288,10 @@ impl<A: LuaArg> ScriptHost for OurScriptHost<A> {
                 (None, Some(f)) => f,
                 _ => "badname",
             };
-            info!("building internal loader for module \"{}\" from file {}",name,script_data.name);
+            info!(
+                "building internal loader for module \"{}\" from file {}",
+                name, script_data.name
+            );
             //TODO: the exact logic of when to call on_load may be wonky right now
             let runstr = format!("
 local name = \"{name}\"
@@ -147,18 +331,31 @@ end
 local tf =  __temp_func
 local function loader()
     local name = \"{name}\"
-    --print(\"lua running require loader for bevy asset \" .. name )
     local result_table = tf(name)
+    local printed = false
     local final_table
     if package and package.loaded and package.loaded[name] and type(package.loaded[name]) == \"table\" then
+        if not printed then print(\"lua require asset: \" .. name ) printed = true end
+        print(\"exists, merge\")
         final_table = package.loaded[name]
         merge(final_table,result_table)
     else
+        if not printed then print(\"lua require asset: \" .. name ) printed = true end
+        print(\"created\")
         final_table = result_table
     end
     if type(final_table) == \"table\" and type(final_table.on_load) == \"function\" then
+        if not printed then print(\"lua require asset: \" .. name ) printed = true end
+        print(\"calling on_load\")
         final_table:on_load(name)
+    elseif type(final_table) == \"table\" then 
+        if not printed then print(\"lua require asset: \" .. name ) printed = true end
+        print(\"nocall final_table.load:\"..type(final_table.on_load))
+    else
+        if not printed then print(\"lua require asset: \" .. name ) printed = true end
+        print(\"nocall final_table:\"..type(final_table))
     end
+
     return final_table
 end
 
@@ -187,25 +384,24 @@ local function rp(depth, tab)
     end
 end
 
-if loaded[name] then 
-    local r = loader()
-    if r and type(r) == \"table\" and r.on_load then
-        r:on_load(name)
-    end
-end
                 ");
             // all that's left is to run our new chunk inside lua.
+            //info!("loading {} [[[ \n{}\n]]]",script_data.name.to_owned(),runstr);
             let new_chunk = lua.load(&runstr);
             new_chunk.exec().map_err(|e| ScriptError::FailedToLoad {
                 script: script_data.name.to_owned(),
                 msg: e.to_string(),
             })?;
+            Ok(())
         };
+        self.print_result(&r, true);
 
         //Provider attachment just gets passed the self lua rather than a contextual lua
         //that's a bit wasteful, and potentially a problem if providers do any unconditual state setup,
         //but I haven't hit on a better way to ensure it gets done.
-        providers.attach_all(&mut self.lua)?;
+        let p = providers.attach_all(&mut self.lua);
+
+        self.print_result(&p, true);
 
         //Due to the trait defintion we need to return a lua
         //That doesn't seem great conceptually if we end up with tons of scripts,
@@ -220,6 +416,7 @@ end
         providers: &mut APIProviders<Self>,
     ) -> std::result::Result<(), ScriptError> {
         //Only change from LuaScriptHost is passing the self context rather than the passed-in context
+        info!("setup script script_data ID {}", script_data.sid);
         providers.setup_all(script_data, &mut self.lua)
     }
 
@@ -232,10 +429,11 @@ end
         ctxs: impl Iterator<Item = (ScriptData<'a>, &'a mut Self::ScriptContext)>,
         providers: &mut APIProviders<Self>,
     ) {
+        //info!("lua handle events, event count {}", events.len());
         // safety:
         // - we have &mut World access
         // - we do not use world_ptr after using the world reference which it's derived from
-        let world_ptr = unsafe { WorldPointer::new(world) };
+        let world_ptr = unsafe { WorldPointerGuard::new(world) };
 
         //Original LuaHost would get the script-specific context here
         //  now it has that be an ignored value because we use the shared context
@@ -254,15 +452,25 @@ end
             ) {
                 (Some(l), None) => l,
                 (None, Some(f)) => f,
-                _ => "badname",
+                _ => script_data.name,
             };
-
+            //info!("\t{name}");
             // We need to ensure that our script has been evaluated, and require does that for us
             //   lua stores the return of a module in a table and provides it to subsequent calls,
             //   or stores `true` if it doesn't return a table.
             // This means that the script loader function only ever gets called once, rather than needing to run it every frame for every instance of the script.
+
             let ctx = self.lua.get_mut().expect("Poison error in context");
-            let code = format!("__event_reciever = require (\"{name}\")");
+            let code = format!(
+                r#"
+                --print("loading for {name}")
+                __event_reciever = require ("{name}")
+                --if type(__event_reciever) == "boolean" then
+                --    print("script {name} return is (bool) " .. __event_reciever)
+                --else
+                --    print("script {name} return is a " .. type(__event_reciever))
+                --end"#
+            );
             let _ = ctx.load(code.as_bytes()).exec();
 
             // LuaHost searched the global context for hook functions
@@ -273,6 +481,14 @@ end
             // in either case, no hooks to call.
             let globals = ctx.globals();
             for event in events {
+                let hook_name = event.hook_name.clone();
+                let global_runner = format!(
+                    r#"
+                our_tools:invoke_global_hook("{hook_name}")
+                    "#
+                );
+                let load_r = ctx.load(global_runner.as_bytes()).exec();
+                print_result_mlua(&load_r, true);
                 // check if this script should handle this event
                 if !event.recipients().is_recipient(&script_data) ||
                     //the required table needs to be a table to receive any events
@@ -280,12 +496,25 @@ end
                         .is_ok_and(|x:LuaValue|
                             matches!(x,LuaValue::Boolean(_) | LuaValue::Nil))
                 {
+                    //error!(
+                    //    "module {name} did not yeild a usable table for {}",
+                    //    event.hook_name
+                    //);
                     continue;
                 }
                 let t: Table = globals.get("__event_reciever").expect("bad table");
                 let f: Function = match t.raw_get(event.hook_name.clone()) {
+                    //Ok(f) => {info!("found hook {} in module {} ", event.hook_name,name);f},
                     Ok(f) => f,
-                    Err(_) => continue, // not subscribed to this event
+                    //Err(_) => continue,
+                    Err(_e) => {
+                        info!(
+                            "did not find function for {} in module {}",
+                            event.hook_name, name
+                        );
+                        continue;
+                    } // not subscribed to this event
+                      //Err(e) => {info!("{:#?}",e); continue}, // not subscribed to this event
                 };
 
                 if let Err(error) = f.call::<_, ()>(event.args.clone()) {

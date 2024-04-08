@@ -1,0 +1,5 @@
+A few pending issues:
+
+Filename/scriptname is fragile right now. The entire assets dir is loaded and we just assume the scripts dir is used and chop up the name based on that. This needs reconsideration with mod loading in mind.
+
+Individually hooked events and global events should be seperated, and indivudal events fixed.
